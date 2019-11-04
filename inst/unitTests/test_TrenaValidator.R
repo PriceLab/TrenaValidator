@@ -11,7 +11,8 @@ if(!exists("tProj")) {
 runTests <- function()
 {
    test_constructor()
-
+   test_enhancers()
+   
 } # runTests
 #------------------------------------------------------------------------------------------------------------------------
 test_constructor <- function()
