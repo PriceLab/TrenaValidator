@@ -5,7 +5,8 @@ if(!exists("tv")) {
    message(sprintf("--- creating instance of TrenaValidator"))
    tbl.benchmark <- get(load(system.file(package="TrenaValidator", "extdata", "tbl.A.RData")))
    mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
-   tv <- TrenaValidator(TF="TWIST1", "MMP2", mtx, tbl.benchmark);
+   tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark);
+   setMatrix(tv, mtx)
    }
 #------------------------------------------------------------------------------------------------------------------------
 motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
@@ -97,7 +98,8 @@ test_CYP1A1 <- function()
    message(sprintf("--- test_CYP1A1"))
    curated.tfs <- subset(tbl.benchmark, target=="CYP1A1" & score == "A")$TF
    mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
-   tv <- TrenaValidator(TF="AHR", "CYP1A1", mtx, tbl.benchmark);
+   tv <- TrenaValidator(TF="AHR", "CYP1A1", tbl.benchmark);
+   setMatrix(tv, mtx)
    tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
    tbl.tfbs <- getTFBS(tv, tbl.gh, fimo.threshold=1e-4, conservation.threshold=0.75, meme.file)
    suppressWarnings(
@@ -115,7 +117,8 @@ test_anyTarget <- function()
    curated.tfs <- subset(tbl.benchmark, target==targetGene & score == "A")$TF
    printf("%s has %d curated tfs", targetGene, length(curated.tfs))
    mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.uterus.RData")))
-   tv <- TrenaValidator(TF="AHR", targetGene, mtx, tbl.benchmark);
+   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
+   setMatrix(tv, mtx)
    tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
    dim(tbl.gh)
    tbl.tfbs <- getTFBS(tv, tbl.gh, fimo.threshold=1e-3, conservation.threshold=0.25, meme.file)

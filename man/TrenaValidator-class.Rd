@@ -7,7 +7,7 @@
 \alias{TrenaValidator}
 \title{TrenaValidator-class}
 \usage{
-TrenaValidator(TF, targetGene, mtx, tbl.benchmark, quiet = TRUE)
+TrenaValidator(TF, targetGene, tbl.benchmark, quiet = TRUE)
 }
 \value{
 An object of the TrenaValidator class

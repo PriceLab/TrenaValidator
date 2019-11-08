@@ -21,7 +21,6 @@
                             representation=representation(
                                TF="character",
                                targetGene="character",
-                               matrix="matrix",
                                tbl.benchmark="data.frame",
                                state="environment",
                                trenaProject="TrenaProject",
@@ -33,6 +32,7 @@ setGeneric('fallbackEnhancers',  signature='obj', function(obj) standardGeneric(
 setGeneric('findEnhancers',  signature='obj', function(obj, eliteOnly) standardGeneric('findEnhancers'))
 setGeneric('getTFBS',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
               standardGeneric('getTFBS'))
+setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric('setMatrix'))
 setGeneric('buildModel',  signature='obj', function(obj) standardGeneric('buildModel'))
 #----------------------------------------------------------------------------------------------------
 #' Define an object of class TrenaValidator
@@ -47,16 +47,18 @@ setGeneric('buildModel',  signature='obj', function(obj) standardGeneric('buildM
 #' @return An object of the TrenaValidator class
 #'
 
-TrenaValidator <- function(TF, targetGene, mtx, tbl.benchmark, quiet=TRUE)
+TrenaValidator <- function(TF, targetGene, tbl.benchmark, quiet=TRUE)
 {
    source("~/github/fimoService/batchMode/fimoBatchTools.R")   # works on hagfish & khaleesi
 
    state <- new.env(parent=emptyenv())
+   state$matrix <- matrix()
+
    tp <- TrenaProjectHG38.generic()
    setTargetGene(tp, targetGene)
 
-   .TrenaValidator(TF=TF, targetGene=targetGene, matrix=mtx,
-                   tbl.benchmark=tbl.benchmark, state=state, trenaProject=tp, quiet=quiet)
+   .TrenaValidator(TF=TF, targetGene=targetGene, tbl.benchmark=tbl.benchmark,
+                   state=state, trenaProject=tp, quiet=quiet)
 
 } # TrenaValidator, the constructor
 #----------------------------------------------------------------------------------------------------
@@ -132,6 +134,25 @@ setMethod('getTFBS',  'TrenaValidator',
          })
 
 #----------------------------------------------------------------------------------------------------
+#' set the matrix to use in model building
+#'
+#' @param obj An instance of the TrenaValidator class
+#' @param matrix a properly normalized numeric matrix with geneSymbol rownames
+#'
+#' @return noting
+#'
+#' @export
+#'
+#' @aliases setMatrix
+#' @rdname setMatrix
+
+setMethod('setMatrix',  'TrenaValidator',
+
+      function(obj, matrix){
+         obj@state$matrix <- matrix
+      })
+
+#----------------------------------------------------------------------------------------------------
 #' return a trena model
 #'
 #' @param obj An instance of the TrenaValidator class
@@ -149,7 +170,7 @@ setMethod('buildModel',  'TrenaValidator',
          tbl.reg <- obj@state$regulatoryRegions
          stopifnot(nrow(tbl.reg) > 0)
          solvers <- c("lasso", "ridge", "lassopv", "pearson", "spearman", "xgboost")
-         x <- EnsembleSolver(obj@matrix,
+         x <- EnsembleSolver(obj@state$matrix,
                              obj@targetGene,
                              unique(tbl.reg$tf),
                              solverNames=solvers)
