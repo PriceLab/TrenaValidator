@@ -7,7 +7,7 @@
 #' @import MotifDb
 #' @import phastCons7way.UCSC.hg38
 #' @import GenomicScores
-
+#' @import trena
 #'
 #' @title TrenaValidator-class
 #'
@@ -33,6 +33,7 @@ setGeneric('fallbackEnhancers',  signature='obj', function(obj) standardGeneric(
 setGeneric('findEnhancers',  signature='obj', function(obj, eliteOnly) standardGeneric('findEnhancers'))
 setGeneric('getTFBS',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
               standardGeneric('getTFBS'))
+setGeneric('buildModel',  signature='obj', function(obj) standardGeneric('buildModel'))
 #----------------------------------------------------------------------------------------------------
 #' Define an object of class TrenaValidator
 #'
@@ -73,7 +74,7 @@ TrenaValidator <- function(TF, targetGene, mtx, tbl.benchmark, quiet=TRUE)
 setMethod('fallbackEnhancers',  'TrenaValidator',
 
    function(obj) {
-     tbl.geneInfo <- getTranscriptsTable(obj@tp)
+     tbl.geneInfo <- getTranscriptsTable(obj@trenaProject)
      tbl.fallbackEnhancers <- with(tbl.geneInfo,
                                    data.frame(chrom=chrom, start=tss-5000, end=tss+5000,
                                               stringsAsFactors=FALSE))
@@ -100,7 +101,7 @@ setMethod('findEnhancers',  'TrenaValidator',
          if(eliteOnly)
             tbl.enhancers <- subset(tbl.enhancers, elite)
          if(nrow(tbl.enhancers) == 0)
-            return(fallbackEnhancers(ob))
+            return(fallbackEnhancers(obj))
          return(tbl.enhancers)
          })
 
@@ -113,22 +114,52 @@ setMethod('findEnhancers',  'TrenaValidator',
 #'
 #' @export
 #'
-#' @aliases getEnhancerTable
-#' @rdname getEnhancerTable
+#' @aliases getTFBS
+#' @rdname getTFBS
 
 setMethod('getTFBS',  'TrenaValidator',
 
       function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile){
          tbl.match <- fimoBatch(tbl.regions, matchThreshold=fimo.threshold, genomeName="hg38",
                                 pwmFile=pwmFile)
-         if(conservation.threshold > 0){
-            tbl.match <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
-                                               GRanges(tbl.match)), stringsAsFactors=FALSE)
-            tbl.match <- subset(tbl.match, default >= conservation.threshold)
-            colnames(tbl.match)[1] <- "chrom"
-            colnames(tbl.match)[grep("default", colnames(tbl.match))] <- "phast7"
-            }
+         tbl.match <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
+                                            GRanges(tbl.match)), stringsAsFactors=FALSE)
+         tbl.match <- subset(tbl.match, default >= conservation.threshold)
+         colnames(tbl.match)[1] <- "chrom"
+         colnames(tbl.match)[grep("default", colnames(tbl.match))] <- "phast7"
+         obj@state$regulatoryRegions <- tbl.match
          tbl.match
+         })
+
+#----------------------------------------------------------------------------------------------------
+#' return a trena model
+#'
+#' @param obj An instance of the TrenaValidator class
+#'
+#' @return a data.frame
+#'
+#' @export
+#'
+#' @aliases buildModel
+#' @rdname buildModel
+
+setMethod('buildModel',  'TrenaValidator',
+
+      function(obj){
+         tbl.reg <- obj@state$regulatoryRegions
+         stopifnot(nrow(tbl.reg) > 0)
+         solvers <- c("lasso", "ridge", "lassopv", "pearson", "spearman", "xgboost")
+         x <- EnsembleSolver(obj@matrix,
+                             obj@targetGene,
+                             unique(tbl.reg$tf),
+                             solverNames=solvers)
+
+         tbl <- run(x)
+         tbl.xtab <- as.data.frame(table(tbl.reg$tf))
+         colnames(tbl.xtab) <- c("tf", "bindingSites")
+         tbl <- merge(tbl, tbl.xtab, by.x="gene", by.y="tf")
+         obj@state$model <- tbl
+         tbl
          })
 
 #----------------------------------------------------------------------------------------------------

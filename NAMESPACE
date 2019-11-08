@@ -2,6 +2,7 @@
 
 export(TrenaValidator)
 exportClasses(TrenaValidator)
+exportMethods(buildModel)
 exportMethods(fallbackEnhancers)
 exportMethods(findEnhancers)
 exportMethods(getTFBS)
@@ -12,4 +13,5 @@ import(TrenaProjectHG38.generic)
 import(methods)
 import(org.Hs.eg.db)
 import(phastCons7way.UCSC.hg38)
+import(trena)
 importFrom(AnnotationDbi,select)
