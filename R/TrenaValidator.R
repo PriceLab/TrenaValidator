@@ -28,11 +28,15 @@
                                ))
 
 #----------------------------------------------------------------------------------------------------
-setGeneric('fallbackEnhancers',  signature='obj', function(obj) standardGeneric('fallbackEnhancers'))
+setGeneric('getSimplePromoter',  signature='obj', function(obj, upstream=5000, downstream=5000)
+              standardGeneric('getSimplePromoter'))
 setGeneric('findEnhancers',  signature='obj', function(obj, eliteOnly) standardGeneric('findEnhancers'))
 setGeneric('getTFBS',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
               standardGeneric('getTFBS'))
 setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric('setMatrix'))
+setGeneric('setRegulatoryRegionsTable',  signature='obj', function(obj, tbl.reg)
+              standardGeneric('setRegulatoryRegionsTable'))
+
 setGeneric('buildModel',  signature='obj', function(obj) standardGeneric('buildModel'))
 #----------------------------------------------------------------------------------------------------
 #' Define an object of class TrenaValidator
@@ -62,25 +66,34 @@ TrenaValidator <- function(TF, targetGene, tbl.benchmark, quiet=TRUE)
 
 } # TrenaValidator, the constructor
 #----------------------------------------------------------------------------------------------------
-#' a simple single 10k regulatory region used if no geneHancers values are avaialable
+#' a simple single regulatory region oritened around the tss
 #'
 #' @param obj An instance of the TrenaValidator class
+#' @param upstream numeric, default 5kb
+#' @param downstream numeric, default 5kb
 #'
 #' @return data.frame
 #'
 #' @export
 #'
-#' @aliases fallbackEnhancers
-#' @rdname fallbackEnhancers
+#' @aliases getSimplePromoter
+#' @rdname getSimplePromoter
 
-setMethod('fallbackEnhancers',  'TrenaValidator',
+setMethod('getSimplePromoter',  'TrenaValidator',
 
-   function(obj) {
+   function(obj, upstream=5000, downstream=5000) {
      tbl.geneInfo <- getTranscriptsTable(obj@trenaProject)
-     tbl.fallbackEnhancers <- with(tbl.geneInfo,
-                                   data.frame(chrom=chrom, start=tss-5000, end=tss+5000,
-                                              stringsAsFactors=FALSE))
-     tbl.fallbackEnhancers
+     tss <- tbl.geneInfo$tss
+     start.loc <- tss - upstream
+     end.loc   <- tss + downstream
+     if(tbl.geneInfo$strand == -1){
+        start.loc <- tss - downstream
+        end.loc   <- tss + upstream
+        }
+     tbl.promoter <- with(tbl.geneInfo,
+                          data.frame(chrom=chrom, start=start.loc, end=end.loc,
+                                     stringsAsFactors=FALSE))
+     tbl.promoter
      })
 
 #---------------------------------------------------------------------------------------------------
@@ -103,7 +116,7 @@ setMethod('findEnhancers',  'TrenaValidator',
          if(eliteOnly)
             tbl.enhancers <- subset(tbl.enhancers, elite)
          if(nrow(tbl.enhancers) == 0)
-            return(fallbackEnhancers(obj))
+            return(getSimplePromoter(obj))
          return(tbl.enhancers)
          })
 
@@ -153,6 +166,25 @@ setMethod('setMatrix',  'TrenaValidator',
       })
 
 #----------------------------------------------------------------------------------------------------
+#' set the regulatory regions table
+#'
+#' @param obj An instance of the TrenaValidator class
+#' @param tbl.reg  A data.frame
+#'
+#' @return noting
+#'
+#' @export
+#'
+#' @aliases setRegulatoryRegionsTable
+#' @rdname setRegulatoryRegionsTable
+
+setMethod('setRegulatoryRegionsTable',  'TrenaValidator',
+
+      function(obj, tbl.reg){
+         obj@state$regulatoryRegions <- tbl.reg
+      })
+
+#----------------------------------------------------------------------------------------------------
 #' return a trena model
 #'
 #' @param obj An instance of the TrenaValidator class
@@ -169,12 +201,12 @@ setMethod('buildModel',  'TrenaValidator',
       function(obj){
          tbl.reg <- obj@state$regulatoryRegions
          stopifnot(nrow(tbl.reg) > 0)
-         solvers <- c("lasso", "ridge", "lassopv", "pearson", "spearman", "xgboost")
+         solvers <- c("lasso", "ridge", "randomforest", "pearson", "spearman", "xgboost")
+         tfs <- unique(intersect(tbl.reg$tf, rownames(obj@state$matrix)))
          x <- EnsembleSolver(obj@state$matrix,
                              obj@targetGene,
-                             unique(tbl.reg$tf),
+                             tfs,
                              solverNames=solvers)
-
          tbl <- run(x)
          tbl.xtab <- as.data.frame(table(tbl.reg$tf))
          colnames(tbl.xtab) <- c("tf", "bindingSites")

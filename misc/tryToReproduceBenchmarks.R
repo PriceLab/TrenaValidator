@@ -23,7 +23,7 @@ lapply(matrix.list, dim)
 buildModelForTargetGene <- function(targetGene, fimo, conservation, upstream=5000, downstream=5000)
 {
    curated.tfs <- subset(tbl.benchmark, target==targetGene & score == "A")$TF
-   printf("%s has %d curated tfs: %s", targetGene, length(curated.tfs), paste(curated.tfs, collapse=", "))
+   printf("%s has %d curated tf/s: %s", targetGene, length(curated.tfs), paste(curated.tfs, collapse=", "))
 
    tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
    tbl.regions <- getSimplePromoter(tv)
@@ -51,13 +51,22 @@ buildModelForTargetGene <- function(targetGene, fimo, conservation, upstream=500
       mtx <- matrix.list[[matrix.name]]
       setMatrix(tv, mtx)
       setRegulatoryRegionsTable(tv, tbl.tfbs)
-      tbl.model <- buildModel(tv)
-      if(any(curated.tfs %in% tbl.model$gene))
+      tbl.model <- tryCatch({
+         tbl.model <- buildModel(tv)
+         },
+      error = function(e){
+         printf(" failed model build: %s", e)
+         return(data.frame())
+         })
+      if(any(curated.tfs %in% tbl.model$gene)){
+         printf("--- model has %d predicted tfs", nrow(model))
          print(subset(tbl.model, gene %in% curated.tfs))
+         break;   # one success is enough for now
+         }
       } # for matrix.name
 
 } # buildModelForTargetGene
 #------------------------------------------------------------------------------------------------------------------------
 tbl.targets <- as.data.frame(sort(table(tbl.benchmark$target)))
-for(target in tbl.targets$Var1[3:5])
+for(target in tbl.targets$Var1[6:10])
    buildModelForTargetGene(target, 1e-3, 0.75, 5000, 5000)
