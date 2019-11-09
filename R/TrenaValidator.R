@@ -33,6 +33,8 @@ setGeneric('getSimplePromoter',  signature='obj', function(obj, upstream=5000, d
 setGeneric('findEnhancers',  signature='obj', function(obj, eliteOnly) standardGeneric('findEnhancers'))
 setGeneric('getTFBS',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
               standardGeneric('getTFBS'))
+setGeneric('getTFBS.bioc',  signature='obj', function(obj, tbl.regions, match.threshold, conservation.threshold, pwms)
+              standardGeneric('getTFBS.bioc'))
 setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric('setMatrix'))
 setGeneric('setRegulatoryRegionsTable',  signature='obj', function(obj, tbl.reg)
               standardGeneric('setRegulatoryRegionsTable'))
@@ -124,6 +126,10 @@ setMethod('findEnhancers',  'TrenaValidator',
 #' return the TFBS
 #'
 #' @param obj An instance of the TrenaValidator class
+#' @param tbl.regions a data.frame with chrom, start, end columns
+#' @param fimo.threshold numeric, 1e-4 for example
+#' @param conservation.threshold numeric, between zero and one
+#' @param pwmFile character string, a full or relative path to a file in meme format
 #'
 #' @return a data.frame
 #'
@@ -135,8 +141,10 @@ setMethod('findEnhancers',  'TrenaValidator',
 setMethod('getTFBS',  'TrenaValidator',
 
       function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile){
+         if(!obj@quiet) printf("starting TrenaValidator::getTFBS")
          tbl.match <- fimoBatch(tbl.regions, matchThreshold=fimo.threshold, genomeName="hg38",
                                 pwmFile=pwmFile)
+         if(!obj@quiet) printf("after TrenaValidator::getTFBS, fimoBatch")
          tbl.match <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
                                             GRanges(tbl.match)), stringsAsFactors=FALSE)
          tbl.match <- subset(tbl.match, default >= conservation.threshold)
@@ -144,6 +152,42 @@ setMethod('getTFBS',  'TrenaValidator',
          colnames(tbl.match)[grep("default", colnames(tbl.match))] <- "phast7"
          obj@state$regulatoryRegions <- tbl.match
          tbl.match
+         })
+
+#----------------------------------------------------------------------------------------------------
+#' return the TFBS using the bioc pwm match, trena MotifMatcher class
+#'
+#' @param obj An instance of the TrenaValidator class
+#' @param tbl.regions a data.frame with chrom, start, end columns
+#' @param match.threshold numeric, between 0 and 100
+#' @param conservation.threshold numeric, between zero and one
+#' @param pwms a list of motifs from MotifDb
+#'
+#' @return a data.frame
+#'
+#' @aliases getTFBS.bioc
+#' @rdname getTFBS.bioc
+#'
+#' @export
+
+setMethod('getTFBS.bioc',  'TrenaValidator',
+
+      function(obj, tbl.regions, match.threshold, conservation.threshold, pwms){
+
+         motifMatcher <- MotifMatcher(genomeName="hg38", pfms=pwms, quiet=obj@quiet)
+         tbl.match <- findMatchesByChromosomalRegion(motifMatcher, tbl.regions,
+                                                     pwmMatchMinimumAsPercentage=match.threshold)
+         colnames(tbl.match)[grep("motifStart", colnames(tbl.match))] <- "start"
+         colnames(tbl.match)[grep("motifEnd", colnames(tbl.match))] <- "end"
+
+         tbl.match.scored <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
+                                                   GRanges(tbl.match)), stringsAsFactors=FALSE)
+         tbl.match.scored <- subset(tbl.match.scored, default >= conservation.threshold)
+         colnames(tbl.match.scored)[grep("seqnames", colnames(tbl.match.scored))] <- "chrom"
+         colnames(tbl.match.scored)[grep("default", colnames(tbl.match.scored))] <- "phast7"
+         tbl.match.scored$tf <- mcols(MotifDb[tbl.match.scored$motifName])$geneSymbol
+         obj@state$regulatoryRegions <- tbl.match.scored
+         tbl.match.scored
          })
 
 #----------------------------------------------------------------------------------------------------

@@ -11,6 +11,14 @@
 }
 \arguments{
 \item{obj}{An instance of the TrenaValidator class}
+
+\item{tbl.regions}{a data.frame with chrom, start, end columns}
+
+\item{fimo.threshold}{numeric, 1e-4 for example}
+
+\item{conservation.threshold}{numeric, between zero and one}
+
+\item{pwmFile}{character string, a full or relative path to a file in meme format}
 }
 \value{
 a data.frame

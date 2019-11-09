@@ -1,4 +1,5 @@
 library(TrenaValidator)
+#library(TrenaProjectHG38.generic())
 library(RUnit)
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("tv")) {
@@ -17,8 +18,9 @@ runTests <- function()
 {
    test_constructor()
    test_enhancers()
-   test_buildBindingSitesTable()
-   #test_buildModel()
+   test_buildBindingSitesTable.fimo()
+   test_buildBindingSitesTable.bioc()
+   test_buildModel()
 
 } # runTests
 #------------------------------------------------------------------------------------------------------------------------
@@ -38,9 +40,9 @@ test_enhancers <- function()
 
 } # test_constructor
 #------------------------------------------------------------------------------------------------------------------------
-test_buildBindingSitesTable <- function()
+test_buildBindingSitesTable.fimo <- function()
 {
-   message(sprintf("--- test_buildBindingSitesTable"))
+   message(sprintf("--- test_buildBindingSitesTable.fimo"))
 
    tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
    widths <- with(tbl.gh, end-start)
@@ -58,38 +60,45 @@ test_buildBindingSitesTable <- function()
    tbl.tfbs.4 <- getTFBS(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.75, meme.file)
    checkTrue(nrow(tbl.tfbs.4) > 5)
 
-} # test_buildBindingSitesTable
+} # test_buildBindingSitesTable.fimo
+#------------------------------------------------------------------------------------------------------------------------
+test_buildBindingSitesTable.bioc <- function()
+{
+   message(sprintf("--- test_buildBindingSitesTable.bioc"))
+
+   tbl.regions <- getSimplePromoter(tv, upstream=2500, downstream=500)
+   tbl.tfbs.1 <- getTFBS.bioc(tv, tbl.regions, match.threshold=98, conservation.threshold=0.95, as.list(motifs))
+   checkTrue(nrow(tbl.tfbs.1) < 10)
+
+   tbl.tfbs.2 <- getTFBS.bioc(tv, tbl.regions, match.threshold=90, conservation.threshold=0.95, as.list(motifs))
+   checkTrue(nrow(tbl.tfbs.2) > 50)
+
+   checkTrue(all(tbl.tfbs.1$tf %in% tbl.tfbs.2$tf))
+
+} # test_buildBindingSitesTable.bioc
 #------------------------------------------------------------------------------------------------------------------------
 test_buildModel <- function()
 {
-   message(sprintf(printf("--- test_buildModel")))
-   tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
-   tbl.tfbs.1 <- getTFBS(tv, tbl.gh, fimo.threshold=1e-5, conservation.threshold=0.95, meme.file)
+   setMatrix(tv, mtx)
 
-   dim(tbl.tfbs.1)
-   length(unique(tbl.tfbs.1$tf))
+   tbl.regions <- getSimplePromoter(tv, upstream=2500, downstream=500)
+   tbl.tfbs <- getTFBS.bioc(tv, tbl.regions, match.threshold=90, conservation.threshold=0.95, as.list(motifs))
+   checkTrue("TWIST1" %in% tbl.tfbs$tf)
 
-   suppressWarnings(
-      tbl.model.1 <- buildModel(tv)
-      )
-   dim(tbl.model.1)
+   dim(tbl.tfbs)
+   setRegulatoryRegionsTable(tv, tbl.tfbs)
 
-   tbl.tfbs.2 <- getTFBS(tv, tbl.gh, fimo.threshold=1e-3, conservation.threshold=0, meme.file)
-   dim(tbl.tfbs.2)
-   length(unique(tbl.tfbs.2$tf))
+   tbl.model <- tryCatch({
+      suppressWarnings(buildModel(tv))
+      },
+   error = function(e){
+      printf(" failed model build: %s", e)
+      return(data.frame())
+      })
 
-   suppressWarnings(
-      tbl.model.2 <- buildModel(tv)
-      )
-   dim(tbl.model.2)
-
-   tbl.reg <- tv@state$regulatoryRegions
-   dim(tbl.reg)
-   tf.keepers <- unique(subset(tbl.reg, phast7 > 0.9 & p.value < 1e-5)$tf)
-   length(tf.keepers)
-   tbl.model.2.refiltered <- subset(tbl.model.2, gene %in% tf.keepers)
-
-   tbl.reg.filtered <- dim(subset(tv@state$regulatoryRegions, phast7 > 0.9 && p.value < 1e-4))
+   printf("nrow(tbl.model): %d", nrow(tbl.model))
+   checkTrue(nrow(tbl.model) > 8)
+   checkTrue("TWIST1" %in% tbl.model$gene)
 
 } # test_buildModel
 #------------------------------------------------------------------------------------------------------------------------

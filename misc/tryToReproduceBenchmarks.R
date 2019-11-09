@@ -18,7 +18,7 @@ if(!exists("tv")) {
    message(sprintf("--- creating instance of TrenaValidator"))
    tbl.benchmark <- get(load(system.file(package="TrenaValidator", "extdata", "tbl.A.RData")))
    # mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
-   tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark);
+   tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark, quiet=FALSE);
    }
 #------------------------------------------------------------------------------------------------------------------------
 motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
@@ -45,7 +45,7 @@ buildModelForTargetGene <- function(targetGene, fimo, conservation, upstream=500
        return(NA)
        }
 
-   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
+   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark, quiet=FALSE);
    tbl.regions <- getSimplePromoter(tv)
    printf("getting tfbs in %d regions", nrow(tbl.regions))
    tbl.tfbs <- getTFBS(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=conservation, meme.file)
@@ -90,7 +90,7 @@ parallel <- TRUE
 
 #------------------------------------------------------------------------------------------------------------------------
 run <- function()
-{    
+{
    for(target in tbl.targets$Var1[207:210])
        buildModelForTargetGene(target, 1e-3, 0.75, 5000, 5000)
 
@@ -99,10 +99,10 @@ run <- function()
 runParallel <- function()
 {
    WORKERS <- 2
-   set.seed(17)
+   #set.seed(17)
    rows <- sort(sample(seq_len(nrow(tbl.targets)), 100))
    #rows <- seq_len(nrow(tbl.targets))[300:350]
-   parallel <- FALSE
+   parallel <- TRUE
 
    func <- function(row){
       targetGene <- as.character(tbl.targets$Var1[row])
@@ -113,12 +113,12 @@ runParallel <- function()
    if(parallel){
       bp.params <- MulticoreParam(stop.on.error=FALSE, log=TRUE, logdir=LOGDIR, threshold="INFO", workers=WORKERS)
       bp.params <- MulticoreParam(workers=WORKERS)
-      bp.params <- SerialParam()
+      #bp.params <- SerialParam()
       printf("starting bplapply")
       results <- bptry({bplapply(rows, func, BPPARAM=bp.params)})
       } # if parallel
-  
-   if(!parallel){   
+
+   if(!parallel){
       results <- lapply(rows, func)
       }
 
