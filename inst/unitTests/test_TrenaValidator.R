@@ -1,5 +1,5 @@
 library(TrenaValidator)
-#library(TrenaProjectHG38.generic())
+library(BiocParallel)
 library(RUnit)
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("tv")) {
@@ -20,6 +20,7 @@ runTests <- function()
    test_enhancers()
    test_buildBindingSitesTable.fimo()
    test_buildBindingSitesTable.bioc()
+   test_buildBindingSitesTable.bioc.parallel()
    test_buildModel()
 
 } # runTests
@@ -79,7 +80,7 @@ test_buildBindingSitesTable.bioc <- function()
 #------------------------------------------------------------------------------------------------------------------------
 test_buildBindingSitesTable.bioc.parallel <- function()
 {
-   message(sprintf("--- test_buildBindingSitesTable.bioc"))
+   message(sprintf("--- test_buildBindingSitesTable.bioc.parallel"))
 
    goi <- c("POLD2", "PTPRC", "SAMD4A")
 
