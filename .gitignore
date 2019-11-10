@@ -1,5 +1,7 @@
 inst/batch/lung-eliteGH/
 inst/batch/lung-eliteGH.log/
+inst/unitTests/outDir/
+inst/unitTests/logDir/
 
 # History files
 .Rhistory
