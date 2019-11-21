@@ -5,6 +5,7 @@ library(RUnit)
 if(!exists("tv")) {
    message(sprintf("--- creating instance of TrenaValidator"))
    tbl.benchmark <- get(load(system.file(package="TrenaValidator", "extdata", "tbl.A.RData")))
+   tbl.benchmark$pubmed.count <- unlist(lapply(strsplit(tbl.benchmark$pubmedID_from_curated_resources, ","), length))
    mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
    tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark);
    setMatrix(tv, mtx)
