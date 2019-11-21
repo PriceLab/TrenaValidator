@@ -85,21 +85,32 @@ test_buildBindingSitesTable.bioc.parallel <- function()
 
    goi <- c("POLD2", "PTPRC", "SAMD4A")
 
+   output.dir <- "~/github/trenaValidator/inst/unitTests/outDir"
+   if(!file.exists(output.dir)) dir.create(output.dir)
+
+   log.dir <- "~/github/trenaValidator/inst/unitTests/logDir"
+   if(!file.exists(log.dir))
+      dir.create(log.dir)
+
+
    f <- function(gene, upstream, downstream, match, conservation){
       tv <- TrenaValidator(TF="TWIST1", "POLD2", tbl.benchmark);
       tbl.regions <- getSimplePromoter(tv, upstream=upstream, downstream=downstream)
-      tbl.tfbs <- getTFBS.bioc(tv, tbl.regions, match.threshold=match, conservation.threshold=conservation, as.list(motifs))
-      result <- list(gene=gene, upstream=upstream, downstream=downstream, match=match, conservation=conservation, tfbs=tbl.tfbs)
-      save.filename <- file.path("~/github/trenaValidator/inst/unitTests/outDir",
+      tbl.tfbs <- getTFBS.bioc(tv, tbl.regions, match.threshold=match, conservation.threshold=conservation,
+                               as.list(motifs))
+      result <- list(gene=gene, upstream=upstream, downstream=downstream, match=match, conservation=conservation,
+                     tfbs=tbl.tfbs)
+      save.filename <- file.path(output.dir,
                                  sprintf("%s-%d.up-%d.down.RData", gene, upstream, downstream))
       save(result, file=save.filename)
       return(result)
       }
 
    time.lapply <- system.time(x <- lapply(goi, function(gene) f(gene, 2500, 2500, 95, 0.95)))
-   log.dir <- "~/github/trenaValidator/inst/unitTests/logDir"
+
    bp.params <- MulticoreParam(stop.on.error=FALSE, log=TRUE, logdir=log.dir, threshold="INFO", workers=2)
-   time.bplapply <- system.time(x.bp <- bplapply(goi, function(gene) f(gene, 2500, 2500, 95, 0.95), BPPARAM=bp.params))
+   time.bplapply <- system.time(x.bp <- bplapply(goi, function(gene) f(gene, 2500, 2500, 95, 0.95),
+                                                 BPPARAM=bp.params))
 
    checkTrue(as.list(time.bplapply)$elapsed < as.list(time.lapply)$elapsed)
 
