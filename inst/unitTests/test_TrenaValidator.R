@@ -1,20 +1,89 @@
 library(TrenaValidator)
+library(TrenaProjectHG38.generic)
 library(BiocParallel)
 library(RUnit)
+library(rnaSeqNormalizer)
+library(org.Hs.eg.db)
+library(GO.db)
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("tv")) {
+   benchmark.full <- "~/github/trena/misc/saez-benchmark-paper/GarciaAlonso_Supplemental_Tables/database.csv"
+   tbl.bm <-read.table(benchmark.full, sep=",", as.is=TRUE, header=TRUE, nrow=-1)
+
    message(sprintf("--- creating instance of TrenaValidator"))
    tbl.benchmark <- get(load(system.file(package="TrenaValidator", "extdata", "tbl.A.RData")))
    tbl.benchmark$pubmed.count <- unlist(lapply(strsplit(tbl.benchmark$pubmedID_from_curated_resources, ","), length))
    mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
    tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark);
    setMatrix(tv, mtx)
+   tp.hg38 <- TrenaProjectHG38.generic()
    }
 #------------------------------------------------------------------------------------------------------------------------
 motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
 meme.file <- "human.hocomoco.meme"
 export(motifs, con=meme.file, format="meme")
-#----------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------------------------
+if(!exists("genes.erythroid")){
+   go.id <- "GO:0030218"  #  erythrocyte differentiation
+   suppressWarnings(tbl.tfe <- select(org.Hs.eg.db, keys=go.id, keytype="GOALL", columns="SYMBOL"))
+   genes.erythroid <- sort(unique(tbl.tfe$SYMBOL))
+   length(genes.erythroid)
+   }
+if(!exists("genes.regulators")){
+   genes.regulators <- c("GATA1", "GATA2", "ZFPM1", "KLF1", "FLI1", "TAL1", "CEBPA", "SPI1", "JUN",
+                         "EGR1", "EGR2", "NAB1", "NAB2", "GFI1", "JUN", "HEY1")
+   }
+#------------------------------------------------------------------------------------------------------------------------
+getCorcesMatrix <- function()
+{
+   file <- "~/github/TrenaProjectErythropoiesis/prep/import/buenrostro/GSE74246_RNAseq_All_Counts.txt"
+   tbl <- read.table(file, sep="\t", as.is=TRUE, header=TRUE, nrow=-1)
+   dim(tbl)
+   rownames(tbl) <- tbl$X_TranscriptID
+   mtx.counts <- as.matrix(tbl[, -1])
+   fivenum(mtx.counts)
+   normalizer <- rnaSeqNormalizer.gtex(mtx.counts, algorithm="log+scale", duplicate.selection.statistic="median")
+   suppressWarnings(
+      mtx.corces <- getNormalizedMatrix(normalizer)
+      )
+   x <- colnames(mtx.corces)
+   mtx.corces[is.nan(mtx.corces)] <- 0
+   deleters <- as.numeric(which(rowSums(abs(mtx.corces)) < 0.1))
+   length(deleters)
+   if(length(deleters) > 0)
+      mtx.corces <- mtx.corces[-deleters,]
+   fivenum(mtx.corces)  # -6.1187049 -0.5273388 -0.1581262  0.5399006  8.8888889
+   dim(mtx.corces)      # 22438    81
+
+   invisible(mtx.corces)
+
+} # getCorcesMatrix
+#------------------------------------------------------------------------------------------------------------------------
+getBrandMatrix <- function()
+{
+   file <- "~/github/TrenaProjectErythropoiesis/prep/import/rnaFromMarjorie/GSE118537_DESeq_Read_Counts.tsv"
+   tbl <- read.table(file, sep="\t", as.is=TRUE, header=TRUE, nrow=-1)
+   dim(tbl)
+   rownames(tbl) <- tbl$GeneName
+   mtx.counts <- as.matrix(tbl[, -1])
+   fivenum(mtx.counts)
+   normalizer <- rnaSeqNormalizer.gtex(mtx.counts, algorithm="log+scale", duplicate.selection.statistic="median")
+   suppressWarnings(
+      mtx.brand <- getNormalizedMatrix(normalizer)
+      )
+   x <- colnames(mtx.brand)
+   mtx.brand[is.nan(mtx.brand)] <- 0
+   deleters <- as.numeric(which(rowSums(abs(mtx.brand)) == 0))
+   length(deleters)
+   if(length(deleters) > 0)
+      mtx.brand <- mtx.brand[-deleters,]
+   fivenum(mtx.brand)  # --4.82003077 -0.57054275 -0.06259517  0.62266976  5.10252039
+   dim(mtx.brand)      # 23452    28
+
+   invisible(mtx.brand)
+
+} # getBrandMatrix
+#------------------------------------------------------------------------------------------------------------------------
 runTests <- function()
 {
    test_constructor()
@@ -178,6 +247,113 @@ test_anyTarget <- function()
    subset(tbl.model, gene %in% curated.tfs)
 
 } # test_anyTarget
+#------------------------------------------------------------------------------------------------------------------------
+test_NFE2 <- function()
+{
+   message(sprintf("--- test_NFE2"))
+   targetGene <- "NFE2"
+   #targetGene <- "RUNX1"
+   #targetGene <- "E2F4"
+   #mtx <- getCorcesMatrix()
+   mtx <- getBrandMatrix()
+   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
+   setMatrix(tv, mtx)
+
+   phast7 <- 0.95
+   fimo <- 1e-5
+   bioc.match <- 95
+   shoulder <- 10000
+
+   tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
+   chrom <- tbl.geneInfo$chrom
+   start.loc <- tbl.geneInfo$tss - shoulder
+   end.loc <- tbl.geneInfo$tss + shoulder
+   tbl.regions <- data.frame(chrom=chrom, start=start.loc, end=end.loc, end=end.loc, stringsAsFactors=FALSE)
+   tbl.tfbs.fimo <- getTFBS.fimo(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=phast7, meme.file)
+   dim(tbl.tfbs.fimo)
+   length(unique(tbl.tfbs.fimo$tf))
+   #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
+   #dim(tbl.tfbs.bioc)
+   #length(unique(tbl.tfbs.bioc$tf))
+
+   suppressWarnings(
+      tbl.model <- buildModel(tv)
+      )
+   print(dim(tbl.model))
+   print(tbl.model)
+
+   tbl.model
+
+} # test_nfe2
+#------------------------------------------------------------------------------------------------------------------------
+parameterized.run <- function(targetGene, matrix.name, phast7=0.75, fimo=1e-5, shoulder=5000)
+{
+   stopifnot(matrix.name %in% c("brand", "corces"))
+
+   mtx <- switch(matrix.name,
+                "brand" = getBrandMatrix(),
+                "corces" = getCorcesMarix()
+                )
+
+   if(!targetGene %in% rownames(mtx)){
+      return(list(gene=targetGene, model=data.frame(), bs=data.frame()))
+      }
+
+   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
+   setMatrix(tv, mtx)
+
+   #phast7 <- 0.95
+   #fimo <- 1e-5
+   #bioc.match <- 95
+   #shoulder <- 10000
+
+   tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
+   chrom <- tbl.geneInfo$chrom
+   start.loc <- tbl.geneInfo$tss - shoulder
+   end.loc <- tbl.geneInfo$tss + shoulder
+   tbl.regions <- data.frame(chrom=chrom, start=start.loc, end=end.loc, end=end.loc, stringsAsFactors=FALSE)
+   tbl.tfbs.fimo <- getTFBS.fimo(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=phast7, meme.file)
+   dim(tbl.tfbs.fimo)
+   length(unique(tbl.tfbs.fimo$tf))
+   #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
+   #dim(tbl.tfbs.bioc)
+   #length(unique(tbl.tfbs.bioc$tf))
+
+   suppressWarnings(
+      tbl.model <- buildModel(tv)
+      )
+   printf("---- %s", targetGene)
+   print(tbl.model)
+
+   list(gene=targetGene, model=tbl.model, bs=tbl.tfbs.fimo)
+
+} # parameterized.run
+#------------------------------------------------------------------------------------------------------------------------
+run <- function()
+{
+   #goi <- sample(genes.erythroid, 3)
+   goi <- genes.erythroid
+   phast7 <- 0.25
+   fimo <- 1e-5
+   shoulder <- 10000
+   matrix <- "brand"
+
+   f <- function(targetGene)
+      tryCatch({
+         parameterized.run(targetGene, matrix.name=matrix, phast7=phast7, fimo=fimo, shoulder=shoulder)
+      },
+      error=function(e){
+         printf("problem with targetGene %s", targetGene)
+         })
+
+   x <- lapply(goi, f)
+   names(x) <- goi
+   filename <- sprintf("run_matrix-%s_phast7-%4.2f_fimo-%3e_shoulder-%d",
+                       matrix, phast7, fimo, shoulder)
+
+   save(x, file=filename)
+
+} # run
 #------------------------------------------------------------------------------------------------------------------------
 if(!interactive())
    runTests()

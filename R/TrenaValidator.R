@@ -31,8 +31,8 @@
 setGeneric('getSimplePromoter',  signature='obj', function(obj, upstream=5000, downstream=5000)
               standardGeneric('getSimplePromoter'))
 setGeneric('findEnhancers',  signature='obj', function(obj, eliteOnly) standardGeneric('findEnhancers'))
-setGeneric('getTFBS',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
-              standardGeneric('getTFBS'))
+setGeneric('getTFBS.fimo',  signature='obj', function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile)
+              standardGeneric('getTFBS.fimo'))
 setGeneric('getTFBS.bioc',  signature='obj', function(obj, tbl.regions, match.threshold, conservation.threshold, pwms)
               standardGeneric('getTFBS.bioc'))
 setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric('setMatrix'))
@@ -135,16 +135,16 @@ setMethod('findEnhancers',  'TrenaValidator',
 #'
 #' @export
 #'
-#' @aliases getTFBS
-#' @rdname getTFBS
+#' @aliases getTFBS.fimo
+#' @rdname getTFBS.fimo
 
-setMethod('getTFBS',  'TrenaValidator',
+setMethod('getTFBS.fimo',  'TrenaValidator',
 
       function(obj, tbl.regions, fimo.threshold, conservation.threshold, pwmFile){
-         if(!obj@quiet) printf("starting TrenaValidator::getTFBS")
+         if(!obj@quiet) printf("starting TrenaValidator::getTFBS.fimo")
          tbl.match <- fimoBatch(tbl.regions, matchThreshold=fimo.threshold, genomeName="hg38",
                                 pwmFile=pwmFile)
-         if(!obj@quiet) printf("after TrenaValidator::getTFBS, fimoBatch")
+         if(!obj@quiet) printf("after TrenaValidator::getTFBS.fimo, fimoBatch")
          tbl.match <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
                                             GRanges(tbl.match)), stringsAsFactors=FALSE)
          tbl.match <- subset(tbl.match, default >= conservation.threshold)
@@ -245,18 +245,51 @@ setMethod('buildModel',  'TrenaValidator',
       function(obj){
          tbl.reg <- obj@state$regulatoryRegions
          stopifnot(nrow(tbl.reg) > 0)
-         solvers <- c("lasso", "ridge", "randomforest", "pearson", "spearman", "xgboost")
+         solvers <- c("lasso", "lassopv", "ridge", "randomforest", "pearson", "spearman", "xgboost")
          tfs <- unique(intersect(tbl.reg$tf, rownames(obj@state$matrix)))
          x <- EnsembleSolver(obj@state$matrix,
                              obj@targetGene,
                              tfs,
+                             geneCutoff=0,
                              solverNames=solvers)
          tbl <- run(x)
          tbl.xtab <- as.data.frame(table(tbl.reg$tf))
          colnames(tbl.xtab) <- c("tf", "bindingSites")
          tbl <- merge(tbl, tbl.xtab, by.x="gene", by.y="tf")
+         if("lassoPValue" %in% colnames(tbl))
+            tbl <- roundNumericColumnsInDataframe(tbl, 3, "lassoPValue")
+         else
+            tbl <- roundNumericColumnsInDataframe(tbl, 3, NA)
          obj@state$model <- tbl
+         new.order <- order(abs(tbl$pearsonCoeff), decreasing=TRUE)
+         tbl <- tbl[new.order,]
+         rownames(tbl) <- NULL
          tbl
          })
 
 #----------------------------------------------------------------------------------------------------
+roundNumericColumnsInDataframe <- function(tbl, digits, pvalColumnNames=NA)
+{
+  tbl.pvals <- data.frame()
+  tbl.main <- tbl
+
+  if(!(all(is.na(pvalColumnNames)))){
+     pval.cols <- grep(pvalColumnNames, colnames(tbl))
+     stopifnot(length(pval.cols) == length(pvalColumnNames))
+     tbl.pvals <- tbl[, pval.cols, drop=FALSE]
+     tbl.main <- tbl[, -pval.cols, drop=FALSE]
+     }
+
+  numeric_columns <- sapply(tbl.main, mode) == 'numeric'
+  tbl.main[numeric_columns] <-  round(tbl.main[numeric_columns], digits)
+
+  tbl.out <- tbl.main
+  if(ncol(tbl.pvals) > 0){
+     tbl.pvals <- apply(tbl.pvals, 2, function(col) as.numeric(formatC(col, format = "e", digits = 2)))
+     tbl.out <- cbind(tbl.out, tbl.pvals)[, colnames(tbl)]
+     }
+
+  tbl.out
+
+} # roundNumericColumnsInDataframe
+#------------------------------------------------------------------------------------------------------------------------
