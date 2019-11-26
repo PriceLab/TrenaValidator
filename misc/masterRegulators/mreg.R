@@ -8,6 +8,7 @@ library(GO.db)
 library(igvR)
 library(GenomicScores)
 library(phastCons7way.UCSC.hg38); phast.7 <- phastCons7way.UCSC.hg38
+library (RColorBrewer)
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("tv")) {
    benchmark.full <- "~/github/trena/misc/saez-benchmark-paper/GarciaAlonso_Supplemental_Tables/database.csv"
@@ -151,7 +152,6 @@ displayModel <- function(x)
       } # for motif
 
 
-   browser()
    xyz <- 99
 
 } # displayModel
@@ -162,7 +162,6 @@ geneHancerTrack <- function(targetGene)
    tbl.gh <- getEnhancers(tp.hg38)
    tbl.gh$width <- with(tbl.gh, 1 + end - start)
    #tbl.gh <- subset(tbl.gh, width < 5000)
-   browser()
    track <- DataFrameQuantitativeTrack("gh", tbl.gh[, c(1,2,3,11)], color="blue", autoscale=FALSE, min=0, max=50)
    displayTrack(igv, track)
 
@@ -215,7 +214,6 @@ getATACseq <- function()
 #------------------------------------------------------------------------------------------------------------------------
 displayATACseq <- function()
 {
-   library (RColorBrewer)
    totalColorCount <- 12
    colors <- brewer.pal(8, "Dark2")
    currentColorNumber <- 0
@@ -250,4 +248,50 @@ displayATACseq <- function()
    displayTrack(igv, track)
 
 } # displayATACseq
+#------------------------------------------------------------------------------------------------------------------------
+run <- function(targetGene, phast7, fimo, upstream, downstream, display=FALSE)
+
+{
+   mtx <- getBrandMatrix()
+   tv <- TrenaValidator(TF=NA_character_, targetGene, tbl.benchmark);
+   setMatrix(tv, mtx)
+
+   #tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
+   tbl.regions <- getSimplePromoter(tv, upstream=2500, downstream=500)
+   tbl.tfbs.fimo <- getTFBS.fimo(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=phast7, meme.file)
+   dim(tbl.tfbs.fimo)
+   tfs <- sort(unique(tbl.tfbs.fimo$tf))
+   tfs
+   length(tfs)
+
+   #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
+   #dim(tbl.tfbs.bioc)
+   #length(unique(tbl.tfbs.bioc$tf))
+
+   suppressWarnings(
+      tbl.model <- buildModel(tv, 0.1)
+      )
+   print(dim(tbl.model))
+   print(tbl.model)
+
+   tbl.tfbs <- subset(tbl.tfbs.fimo, tf %in% tbl.model$gene)
+
+   result <- list(model=tbl.model, tfbs=tbl.tfbs)
+   if(display)
+      displayModel(result)
+
+   result
+
+} # run
+#------------------------------------------------------------------------------------------------------------------------
+tal1 <- function()
+{
+  targetGene <- "TAL1"
+  x <- run(targetGene, 0.9, 1e-5, 2500, 500, TRUE)
+  conservationTrack()
+  displayATACseq()
+  geneHancerTrack(targetGene)
+  invisible(x)
+
+} # tal1
 #------------------------------------------------------------------------------------------------------------------------
