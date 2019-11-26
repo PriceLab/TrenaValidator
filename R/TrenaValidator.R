@@ -39,7 +39,7 @@ setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric
 setGeneric('setRegulatoryRegionsTable',  signature='obj', function(obj, tbl.reg)
               standardGeneric('setRegulatoryRegionsTable'))
 
-setGeneric('buildModel',  signature='obj', function(obj) standardGeneric('buildModel'))
+setGeneric('buildModel',  signature='obj', function(obj, geneCutoff=0) standardGeneric('buildModel'))
 #----------------------------------------------------------------------------------------------------
 #' Define an object of class TrenaValidator
 #'
@@ -232,6 +232,7 @@ setMethod('setRegulatoryRegionsTable',  'TrenaValidator',
 #' return a trena model
 #'
 #' @param obj An instance of the TrenaValidator class
+#' @param geneCutoff numeric, betweeen 0 and 1, controls inclusion of weaker TFs in model
 #'
 #' @return a data.frame
 #'
@@ -242,7 +243,7 @@ setMethod('setRegulatoryRegionsTable',  'TrenaValidator',
 
 setMethod('buildModel',  'TrenaValidator',
 
-      function(obj){
+      function(obj, geneCutoff=0){
          tbl.reg <- obj@state$regulatoryRegions
          stopifnot(nrow(tbl.reg) > 0)
          solvers <- c("lasso", "lassopv", "ridge", "randomforest", "pearson", "spearman", "xgboost")
@@ -250,7 +251,7 @@ setMethod('buildModel',  'TrenaValidator',
          x <- EnsembleSolver(obj@state$matrix,
                              obj@targetGene,
                              tfs,
-                             geneCutoff=0,
+                             geneCutoff=0.5,
                              solverNames=solvers)
          tbl <- run(x)
          tbl.xtab <- as.data.frame(table(tbl.reg$tf))

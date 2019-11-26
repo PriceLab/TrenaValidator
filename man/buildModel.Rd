@@ -5,10 +5,12 @@
 \alias{buildModel}
 \title{return a trena model}
 \usage{
-\S4method{buildModel}{TrenaValidator}(obj)
+\S4method{buildModel}{TrenaValidator}(obj, geneCutoff = 0)
 }
 \arguments{
 \item{obj}{An instance of the TrenaValidator class}
+
+\item{geneCutoff}{numeric, betweeen 0 and 1, controls inclusion of weaker TFs in model}
 }
 \value{
 a data.frame
