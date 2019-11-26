@@ -19,8 +19,10 @@ if(!exists("tv")) {
    tp.hg38 <- TrenaProjectHG38.generic()
    }
 #------------------------------------------------------------------------------------------------------------------------
-motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
-meme.file <- "human.hocomoco.meme"
+# motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
+# meme.file <- "human.hocomoco.meme"
+motifs <- query(MotifDb, "hsapiens", c("jaspar2018"))
+meme.file <- "human.jaspar2018.meme"
 export(motifs, con=meme.file, format="meme")
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("genes.erythroid")){
@@ -33,6 +35,9 @@ if(!exists("genes.regulators")){
    genes.regulators <- c("GATA1", "GATA2", "ZFPM1", "KLF1", "FLI1", "TAL1", "CEBPA", "SPI1", "JUN",
                          "EGR1", "EGR2", "NAB1", "NAB2", "GFI1", "JUN", "HEY1")
    }
+
+genes.other <- c("NFE2")
+genes.all <- sort(unique(c(genes.regulators, genes.erythroid, genes.other)))
 #------------------------------------------------------------------------------------------------------------------------
 getCorcesMatrix <- function()
 {
@@ -119,16 +124,16 @@ test_buildBindingSitesTable.fimo <- function()
    widths <- with(tbl.gh, end-start)
    keepers <- which(widths < 500)
 
-   tbl.tfbs.1 <- getTFBS(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.95, meme.file)
+   tbl.tfbs.1 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.95, meme.file)
    checkTrue(nrow(tbl.tfbs.1) < 5)
 
-   tbl.tfbs.2 <- getTFBS(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0, meme.file)
+   tbl.tfbs.2 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0, meme.file)
    checkTrue(nrow(tbl.tfbs.2) > 1000)
 
-   tbl.tfbs.3 <- getTFBS(tv, tbl.gh[1,], fimo.threshold=1e-2, conservation.threshold=0.95, meme.file)
+   tbl.tfbs.3 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-2, conservation.threshold=0.95, meme.file)
    checkTrue(nrow(tbl.tfbs.3) > 100)
 
-   tbl.tfbs.4 <- getTFBS(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.75, meme.file)
+   tbl.tfbs.4 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.75, meme.file)
    checkTrue(nrow(tbl.tfbs.4) > 5)
 
 } # test_buildBindingSitesTable.fimo
@@ -218,7 +223,7 @@ test_CYP1A1 <- function()
    tv <- TrenaValidator(TF="AHR", "CYP1A1", tbl.benchmark);
    setMatrix(tv, mtx)
    tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
-   tbl.tfbs <- getTFBS(tv, tbl.gh, fimo.threshold=1e-4, conservation.threshold=0.75, meme.file)
+   tbl.tfbs <- getTFBS.fimo(tv, tbl.gh, fimo.threshold=1e-4, conservation.threshold=0.75, meme.file)
    suppressWarnings(
       tbl.model <- buildModel(tv)
       )
@@ -238,7 +243,7 @@ test_anyTarget <- function()
    setMatrix(tv, mtx)
    tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
    dim(tbl.gh)
-   tbl.tfbs <- getTFBS(tv, tbl.gh, fimo.threshold=1e-3, conservation.threshold=0.25, meme.file)
+   tbl.tfbs <- getTFBS.fimo(tv, tbl.gh, fimo.threshold=1e-3, conservation.threshold=0.25, meme.file)
    dim(tbl.tfbs)
    suppressWarnings(
       tbl.model <- buildModel(tv)
@@ -252,26 +257,27 @@ test_NFE2 <- function()
 {
    message(sprintf("--- test_NFE2"))
    targetGene <- "NFE2"
+   targetGene <- "GATA1"
    #targetGene <- "RUNX1"
    #targetGene <- "E2F4"
    #mtx <- getCorcesMatrix()
    mtx <- getBrandMatrix()
-   tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
+   tv <- TrenaValidator(TF=NA_character_, targetGene, tbl.benchmark);
    setMatrix(tv, mtx)
 
-   phast7 <- 0.95
-   fimo <- 1e-5
-   bioc.match <- 95
-   shoulder <- 10000
+   phast7 <- 0.90
+   fimo <- 1e-4
+   #bioc.match <- 95
+   #shoulder <- 10000
 
-   tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
-   chrom <- tbl.geneInfo$chrom
-   start.loc <- tbl.geneInfo$tss - shoulder
-   end.loc <- tbl.geneInfo$tss + shoulder
-   tbl.regions <- data.frame(chrom=chrom, start=start.loc, end=end.loc, end=end.loc, stringsAsFactors=FALSE)
+   #tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
+   tbl.regions <- getSimplePromoter(tv, upstream=2500, downstream=500)
    tbl.tfbs.fimo <- getTFBS.fimo(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=phast7, meme.file)
    dim(tbl.tfbs.fimo)
-   length(unique(tbl.tfbs.fimo$tf))
+   tfs <- sort(unique(tbl.tfbs.fimo$tf))
+   tfs
+   length(tfs)
+   
    #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
    #dim(tbl.tfbs.bioc)
    #length(unique(tbl.tfbs.bioc$tf))
@@ -302,11 +308,6 @@ parameterized.run <- function(targetGene, matrix.name, phast7=0.75, fimo=1e-5, s
    tv <- TrenaValidator(TF="AHR", targetGene, tbl.benchmark);
    setMatrix(tv, mtx)
 
-   #phast7 <- 0.95
-   #fimo <- 1e-5
-   #bioc.match <- 95
-   #shoulder <- 10000
-
    tbl.geneInfo <- getTranscriptsTable(tp.hg38, targetGene)
    chrom <- tbl.geneInfo$chrom
    start.loc <- tbl.geneInfo$tss - shoulder
@@ -315,28 +316,23 @@ parameterized.run <- function(targetGene, matrix.name, phast7=0.75, fimo=1e-5, s
    tbl.tfbs.fimo <- getTFBS.fimo(tv, tbl.regions, fimo.threshold=fimo, conservation.threshold=phast7, meme.file)
    dim(tbl.tfbs.fimo)
    length(unique(tbl.tfbs.fimo$tf))
-   #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
-   #dim(tbl.tfbs.bioc)
-   #length(unique(tbl.tfbs.bioc$tf))
 
    suppressWarnings(
       tbl.model <- buildModel(tv)
       )
    printf("---- %s", targetGene)
+   tbl.model$targetGene <- targetGene
+   tbl.model$phast7 <- phast7
+   tbl.model$fimo <- fimo
+   tbl.model$shoulder <- shoulder
    print(tbl.model)
 
    list(gene=targetGene, model=tbl.model, bs=tbl.tfbs.fimo)
 
 } # parameterized.run
 #------------------------------------------------------------------------------------------------------------------------
-run <- function()
+run <- function(goi=genes.all, phast7=0.5, fimo=1e-4, shoulder=5000, matrix="brand")
 {
-   #goi <- sample(genes.erythroid, 3)
-   goi <- genes.erythroid
-   phast7 <- 0.25
-   fimo <- 1e-5
-   shoulder <- 10000
-   matrix <- "brand"
 
    f <- function(targetGene)
       tryCatch({
@@ -355,5 +351,7 @@ run <- function()
 
 } # run
 #------------------------------------------------------------------------------------------------------------------------
-if(!interactive())
-   runTests()
+if(!interactive()){
+    #runTests()
+    run()
+    }
