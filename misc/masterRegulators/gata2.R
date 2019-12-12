@@ -9,6 +9,9 @@ library(igvR)
 library(GenomicScores)
 library(phastCons7way.UCSC.hg38); phast.7 <- phastCons7way.UCSC.hg38
 library (RColorBrewer)
+library(PSICQUIC)
+#------------------------------------------------------------------------------------------------------------------------
+targetGene <- "GATA2"
 #------------------------------------------------------------------------------------------------------------------------
 if(!exists("tv")) {
    benchmark.full <- "~/github/trena/misc/saez-benchmark-paper/GarciaAlonso_Supplemental_Tables/database.csv"
@@ -18,7 +21,7 @@ if(!exists("tv")) {
    tbl.benchmark <- get(load(system.file(package="TrenaValidator", "extdata", "tbl.A.RData")))
    tbl.benchmark$pubmed.count <- unlist(lapply(strsplit(tbl.benchmark$pubmedID_from_curated_resources, ","), length))
    #mtx <- get(load(system.file(package="TrenaValidator", "extdata", "mtx.gtex.lung.RData")))
-   tv <- TrenaValidator(TF="TWIST1", "MMP2", tbl.benchmark);
+   tv <- TrenaValidator(TF="TWIST1", targetGene, tbl.benchmark);
    #setMatrix(tv, mtx)
    tp.hg38 <- TrenaProjectHG38.generic()
    }
@@ -26,11 +29,12 @@ if(!exists("tv")) {
 if(!exists("igv")) {
    igv <- igvR()
    setGenome(igv, "hg38")
+   setBrowserWindowTitle(igv, targetGene)
    }
 #------------------------------------------------------------------------------------------------------------------------
 # motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
 # meme.file <- "human.hocomoco.meme"
-motifs <- query(MotifDb, "hsapiens", c("jaspar2018"))
+motifs <- query(MotifDb, "hsapiens", c("jaspar2018", "hocomoco"))
 meme.file <- "human.jaspar2018.meme"
 export(motifs, con=meme.file, format="meme")
 #------------------------------------------------------------------------------------------------------------------------
@@ -306,6 +310,7 @@ run <- function(targetGene, phast7, fimo, bioc, upstream, downstream, display=FA
    print(dim(tbl.model))
    print(tbl.model)
 
+   tbl.model <- subset(tbl.model, abs(pearsonCoeff) > 0.4)
    result <- list(model=tbl.model, tfbs=tbl.tfbs)
 
    if(display)
@@ -330,20 +335,27 @@ tal1 <- function(conservation=0.5, fimo=NA_real_, bioc=NA_integer_, upstream=250
 
 } # tal1
 #------------------------------------------------------------------------------------------------------------------------
-tal1 <- function(conservation=0.5, fimo=NA_real_, bioc=NA_integer_, upstream=2500, downstream=500 )
+gata2 <- function(conservation=0.5, fimo=NA_real_, bioc=NA_integer_, upstream=2500, downstream=500 )
 {
-  targetGene <- "TAL1"
+  targetGene <- "GATA2"
   printf("modeling %s.  conservation: %5.2f   fimo: %5.2e   bioc: %d, upsteam:  %d   downstream: %d",
          targetGene, conservation, fimo, bioc, upstream, downstream)
+  tbl.regions <- getSimplePromoter(tv, upstream=upstream, downstream=downstream)
+  showGenomicRegion(igv, with(tbl.regions, sprintf("%s:%d-%d", chrom, start, end)))
+
   removeTracksByName(igv, getTrackNames(igv)[-1])
-  x <- run(targetGene, conservation, fimo, bioc, upstream, downstream, TRUE)
   conservationTrack()
-  displayATACseq(TRUE)
+  x <- run(targetGene, conservation, fimo, bioc, upstream, downstream, TRUE)
+  displayATACseq(FALSE)
   junk <- lapply(x$model$gene, function(tf) chipTrack(tf, tissueRestriction="K562"))
-  #geneHancerTrack(targetGene)
+  geneHancerTrack(targetGene)
+  for(tf in x$model$gene){
+     chipTrack(tf, tissueRestriction="K562")
+     }
+
   invisible(x)
 
-} # tal1
+} # gata2
 #------------------------------------------------------------------------------------------------------------------------
 explore.znf263.tfbs <- function()
 {

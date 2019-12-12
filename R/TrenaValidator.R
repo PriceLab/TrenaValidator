@@ -35,6 +35,8 @@ setGeneric('getTFBS.fimo',  signature='obj', function(obj, tbl.regions, fimo.thr
               standardGeneric('getTFBS.fimo'))
 setGeneric('getTFBS.bioc',  signature='obj', function(obj, tbl.regions, match.threshold, conservation.threshold, pwms)
               standardGeneric('getTFBS.bioc'))
+setGeneric('getTFBS.moods',  signature='obj', function(obj, tbl.regions, match.threshold, conservation.threshold, motifs)
+              standardGeneric('getTFBS.moods'))
 setGeneric('setMatrix',   signature='obj', function(obj, matrix) standardGeneric('setMatrix'))
 setGeneric('setRegulatoryRegionsTable',  signature='obj', function(obj, tbl.reg)
               standardGeneric('setRegulatoryRegionsTable'))
@@ -155,6 +157,38 @@ setMethod('getTFBS.fimo',  'TrenaValidator',
          })
 
 #----------------------------------------------------------------------------------------------------
+#' return the TFBS
+#'
+#' @param obj An instance of the TrenaValidator class
+#' @param tbl.regions a data.frame with chrom, start, end columns
+#' @param match.threshold numeric, 1e-4 for example
+#' @param conservation.threshold numeric, between zero and one
+#' @param motifs  a list of motifs, the result of a MotifDb query
+#'
+#' @return a data.frame
+#'
+#' @export
+#'
+#' @aliases getTFBS.moods
+#' @rdname getTFBS.moods
+
+setMethod('getTFBS.moods',  'TrenaValidator',
+
+      function(obj, tbl.regions, match.threshold, conservation.threshold, motifs){
+         if(!obj@quiet) printf("starting TrenaValidator::getTFBS.moods")
+         gr.regions <- with(tbl.regions, GRanges(seqnames=chrom, IRanges(start=start, end=end)))
+         tbl.match <- matchMotif(MotifDb, motifs, "hg38", gr.regions, match.threshold, fimoDataFrameStyle=TRUE)
+         if(!obj@quiet) printf("after TrenaValidator::getTFBS.moods, hits: %d", nrow(tbl.match))
+         tbl.match <- as.data.frame(gscores(phastCons7way.UCSC.hg38,
+                                            GRanges(tbl.match)), stringsAsFactors=FALSE)
+         tbl.match <- subset(tbl.match, default >= conservation.threshold)
+         colnames(tbl.match)[1] <- "chrom"
+         colnames(tbl.match)[grep("default", colnames(tbl.match))] <- "phast7"
+         obj@state$regulatoryRegions <- tbl.match
+         tbl.match
+         })
+
+#----------------------------------------------------------------------------------------------------
 #' return the TFBS using the bioc pwm match, trena MotifMatcher class
 #'
 #' @param obj An instance of the TrenaValidator class
@@ -251,7 +285,7 @@ setMethod('buildModel',  'TrenaValidator',
          x <- EnsembleSolver(obj@state$matrix,
                              obj@targetGene,
                              tfs,
-                             geneCutoff=0.5,
+                             geneCutoff=geneCutoff,
                              solverNames=solvers)
          tbl <- run(x)
          tbl.xtab <- as.data.frame(table(tbl.reg$tf))

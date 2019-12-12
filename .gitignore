@@ -3,6 +3,8 @@ inst/batch/lung-eliteGH.log/
 inst/unitTests/outDir/
 inst/unitTests/logDir/
 
+.meme
+
 # History files
 .Rhistory
 .Rapp.history

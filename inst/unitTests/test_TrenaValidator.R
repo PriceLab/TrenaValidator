@@ -94,6 +94,7 @@ runTests <- function()
    test_constructor()
    test_enhancers()
    test_buildBindingSitesTable.fimo()
+   test_buildBindingSitesTable.moods()
    test_buildBindingSitesTable.bioc()
    test_buildBindingSitesTable.bioc.parallel()
    test_buildModel()
@@ -128,15 +129,37 @@ test_buildBindingSitesTable.fimo <- function()
    checkTrue(nrow(tbl.tfbs.1) < 5)
 
    tbl.tfbs.2 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0, meme.file)
-   checkTrue(nrow(tbl.tfbs.2) > 1000)
+   checkTrue(nrow(tbl.tfbs.2) > 500)
 
    tbl.tfbs.3 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-2, conservation.threshold=0.95, meme.file)
-   checkTrue(nrow(tbl.tfbs.3) > 100)
+   checkTrue(nrow(tbl.tfbs.3) > 40)
 
    tbl.tfbs.4 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.75, meme.file)
-   checkTrue(nrow(tbl.tfbs.4) > 5)
+   checkTrue(nrow(tbl.tfbs.4) > 0)
 
 } # test_buildBindingSitesTable.fimo
+#------------------------------------------------------------------------------------------------------------------------
+test_buildBindingSitesTable.moods <- function()
+{
+   message(sprintf("--- test_buildBindingSitesTable.moods"))
+
+   tbl.gh <- findEnhancers(tv, eliteOnly=TRUE)
+   widths <- with(tbl.gh, end-start)
+   keepers <- which(widths < 500)
+
+   tbl.tfbs.1 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-3, conservation.threshold=0.95, motifs)
+   checkTrue(nrow(tbl.tfbs.1) < 5)
+
+   tbl.tfbs.2 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-3, conservation.threshold=0, motifs)
+   checkTrue(nrow(tbl.tfbs.2) > 500)
+
+   tbl.tfbs.3 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-2, conservation.threshold=0.95, motifs)
+   checkTrue(nrow(tbl.tfbs.3) > 40)
+
+   tbl.tfbs.4 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-3, conservation.threshold=0.75, motifs)
+   checkTrue(nrow(tbl.tfbs.4) > 0)
+
+} # test_buildBindingSitesTable.moods
 #------------------------------------------------------------------------------------------------------------------------
 test_buildBindingSitesTable.bioc <- function()
 {
@@ -144,10 +167,12 @@ test_buildBindingSitesTable.bioc <- function()
 
    tbl.regions <- getSimplePromoter(tv, upstream=2500, downstream=500)
    tbl.tfbs.1 <- getTFBS.bioc(tv, tbl.regions, match.threshold=98, conservation.threshold=0.95, as.list(motifs))
-   checkTrue(nrow(tbl.tfbs.1) < 10)
+   dim(tbl.tfbs.1)
+   checkTrue(nrow(tbl.tfbs.1) > 0 && nrow(tbl.tfbs.1) < 10)
 
    tbl.tfbs.2 <- getTFBS.bioc(tv, tbl.regions, match.threshold=90, conservation.threshold=0.95, as.list(motifs))
-   checkTrue(nrow(tbl.tfbs.2) > 50)
+   dim(tbl.tfbs.2)
+   checkTrue(nrow(tbl.tfbs.2) > 20)
 
    checkTrue(all(tbl.tfbs.1$tf %in% tbl.tfbs.2$tf))
 
@@ -277,7 +302,7 @@ test_NFE2 <- function()
    tfs <- sort(unique(tbl.tfbs.fimo$tf))
    tfs
    length(tfs)
-   
+
    #tbl.tfbs.bioc <- getTFBS.bioc(tv, tbl.regions, match.threshold=bioc.match, conservation.threshold=phast7, as.list(motifs))
    #dim(tbl.tfbs.bioc)
    #length(unique(tbl.tfbs.bioc$tf))
@@ -352,6 +377,6 @@ run <- function(goi=genes.all, phast7=0.5, fimo=1e-4, shoulder=5000, matrix="bra
 } # run
 #------------------------------------------------------------------------------------------------------------------------
 if(!interactive()){
-    #runTests()
-    run()
+    runTests()
+    #run()
     }
