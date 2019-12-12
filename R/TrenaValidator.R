@@ -184,6 +184,8 @@ setMethod('getTFBS.moods',  'TrenaValidator',
          tbl.match <- subset(tbl.match, default >= conservation.threshold)
          colnames(tbl.match)[1] <- "chrom"
          colnames(tbl.match)[grep("default", colnames(tbl.match))] <- "phast7"
+         tfs <- mcols(MotifDb[tbl.match$motif])$geneSymbol
+         tbl.match$tf <- tfs
          obj@state$regulatoryRegions <- tbl.match
          tbl.match
          })

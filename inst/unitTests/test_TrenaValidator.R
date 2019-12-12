@@ -127,6 +127,7 @@ test_buildBindingSitesTable.fimo <- function()
 
    tbl.tfbs.1 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0.95, meme.file)
    checkTrue(nrow(tbl.tfbs.1) < 5)
+   checkTrue("tf" %in% colnames(tbl.tfbs.1))
 
    tbl.tfbs.2 <- getTFBS.fimo(tv, tbl.gh[1,], fimo.threshold=1e-3, conservation.threshold=0, meme.file)
    checkTrue(nrow(tbl.tfbs.2) > 500)
@@ -149,6 +150,7 @@ test_buildBindingSitesTable.moods <- function()
 
    tbl.tfbs.1 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-3, conservation.threshold=0.95, motifs)
    checkTrue(nrow(tbl.tfbs.1) < 5)
+   checkTrue("tf" %in% colnames(tbl.tfbs.1))
 
    tbl.tfbs.2 <- getTFBS.moods(tv, tbl.gh[1,], match.threshold=1e-3, conservation.threshold=0, motifs)
    checkTrue(nrow(tbl.tfbs.2) > 500)

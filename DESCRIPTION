@@ -1,7 +1,7 @@
 Package: TrenaValidator
 Title: can trena reproduce known TF/targetGene relationships?
-Date: 2019-11-27
-Version: 1.0.18
+Date: 2019-12-11
+Version: 1.0.19
 Author: Paul Shannon
 Maintainer: Paul Shannon <pshannon@systemsbiology.org>
 Description: Build trena models with expression from all GTEx tissues, try to reproduce known relationships
